@@ -1,0 +1,633 @@
+import pymssql
+import pandas as pd
+from openpyxl import Workbook
+from openpyxl.styles import PatternFill, Font, Alignment
+# 数据库配置
+server = "(local)"
+user = "sa"
+password = "20020410"
+database = "1111"
+
+# 数据库连接
+conn = pymssql.connect(server, user, password, database)
+cursor = conn.cursor()
+
+if cursor:
+    print("连接成功!")
+
+
+
+# 查询语句列表
+sql_queries = {
+    'Sheet1': ["""
+        SELECT
+	* 
+FROM
+	(
+	SELECT
+		[战区tier].Tier,
+		[客户经营BMS总表].[战区],
+		COUNT ( [客户经营BMS总表].[客户编号] ) AS [客户数量],
+		SUM ( CASE WHEN CAST ( [客户经营BMS总表].[YTD是否拜访] AS INT ) + CAST ( [客户经营BMS总表].[YTD是否外呼] AS INT ) > 0 THEN 1 ELSE 0 END ) AS [YTD覆盖客户数],
+		CAST (
+			CAST (
+				ROUND(
+				SUM ( CASE WHEN CAST ( [客户经营BMS总表].[YTD是否拜访] AS INT ) + CAST ( [客户经营BMS总表].[YTD是否外呼] AS INT ) > 0 THEN 1 ELSE 0 END ) * 100.0 / COUNT ( [客户经营BMS总表].[客户编号] ),
+	0 
+	) AS INT 
+	) AS NVARCHAR 
+	) + '%' AS [YTD覆盖率%],
+	SUM ( CAST ( [客户经营BMS总表].[IDG FY23 YTD REV激活 ] AS FLOAT ) ) AS [FY23 YTD IDG激活 ],
+	CAST (
+		ROUND(
+		CASE
+				
+				WHEN COUNT ( [客户经营BMS总表].[客户编号] ) > 0 THEN
+				( SUM ( CAST ( [客户经营BMS总表].[IDG FY23 YTD REV激活] AS FLOAT ) ) / COUNT ( [客户经营BMS总表].[客户编号] ) ) * 100 ELSE 0 
+			END,
+			0 
+		) AS NVARCHAR 
+	) + '%' AS [IDG激活率%],
+	SUM ( CAST ( [客户经营BMS总表].[IDG FY22 YTD REV激活 ] AS FLOAT ) ) AS [FY22 YTD IDG激活 ],
+	CAST (
+		ROUND(
+		CASE
+				
+				WHEN SUM ( CAST ( [客户经营BMS总表].[IDG FY22 YTD REV激活] AS FLOAT ) ) > 0 THEN
+				( SUM ( CAST ( [客户经营BMS总表].[IDG FY23 YTD REV激活] AS FLOAT ) ) - SUM ( CAST ( [客户经营BMS总表].[IDG FY22 YTD REV激活] AS FLOAT ) ) ) / SUM ( CAST ( [客户经营BMS总表].[IDG FY22 YTD REV激活] AS FLOAT ) ) * 100 ELSE 0 
+			END,
+			0 
+		) AS NVARCHAR 
+	) + '%' AS [ IDG 激活 YoY],
+	SUM ( CAST ( [客户经营BMS总表].[IDG FY23 YTD REV] AS FLOAT )/1000 ) AS [FY23 YTD IDG REV],
+	SUM ( CAST ( [客户经营BMS总表].[IDG FY22 YTD REV] AS FLOAT )/1000 ) AS [FY22 YTD IDG REV],
+	CAST (
+		ROUND(
+		CASE
+				
+				WHEN SUM ( CAST ( [客户经营BMS总表].[IDG FY22 YTD REV] AS FLOAT ) ) > 0 THEN
+				( SUM ( CAST ( [客户经营BMS总表].[IDG FY23 YTD REV] AS FLOAT ) ) - SUM ( CAST ( [客户经营BMS总表].[IDG FY22 YTD REV] AS FLOAT ) ) ) / SUM ( CAST ( [客户经营BMS总表].[IDG FY22 YTD REV] AS FLOAT ) ) * 100 ELSE 0 
+			END,
+			0 
+		) AS NVARCHAR 
+	) + '%' AS [ IDG 产出Rev YoY],
+	SUM ( CAST ( [客户经营BMS总表].[FY23 IDG是否产生商机] AS INT ) ) AS [FY23 IDG商机总数],
+	CAST (
+		ROUND(
+		CASE
+				
+				WHEN COUNT ( [客户经营BMS总表].[客户编号] ) > 0 THEN
+				( SUM ( CAST ( [客户经营BMS总表].[FY23 IDG是否产生商机] AS FLOAT ) ) / COUNT ( [客户经营BMS总表].[客户编号] ) ) * 100 ELSE 0 
+			END,
+			0 
+		) AS NVARCHAR 
+	) + '%' AS [FY23 IDG商机率],
+	SUM ( CAST ( [FY23 YTD IDG商机 REV$] AS FLOAT )/1000 ) AS [ FY23 YTD IDG商机储备Rev(K$)] 
+FROM
+	dbo.[战区tier]
+	INNER JOIN dbo.[客户经营BMS总表] ON [战区tier].[战区] = [客户经营BMS总表].[战区] 
+WHERE
+	[客户经营BMS总表].[Project D PC] = 'Project D PC' 
+GROUP BY
+	[战区tier].Tier,
+	[客户经营BMS总表].[战区] UNION ALL-- 总计查询部分
+SELECT
+	'总计' AS Tier,
+	'总计' AS [战区],
+	COUNT ( [客户编号] ) AS [客户数量],
+	SUM ( CASE WHEN CAST ( [客户经营BMS总表].[YTD是否拜访] AS INT ) + CAST ( [客户经营BMS总表].[YTD是否外呼] AS INT ) > 0 THEN 1 ELSE 0 END ) AS [YTD覆盖客户数],
+	CAST (
+		CAST (
+			ROUND(
+			SUM ( CASE WHEN CAST ( [客户经营BMS总表].[YTD是否拜访] AS INT ) + CAST ( [客户经营BMS总表].[YTD是否外呼] AS INT ) > 0 THEN 1 ELSE 0 END ) * 100.0 / COUNT ( [客户经营BMS总表].[客户编号] ),
+	0 
+	) AS INT 
+	) AS NVARCHAR 
+	) + '%' AS [YTD覆盖率%],
+	SUM ( CAST ( [IDG FY23 YTD REV激活 ] AS FLOAT ) ) AS [FY23 YTD IDG激活 ],
+	CAST (
+		ROUND(
+		CASE
+				
+				WHEN COUNT ( [客户经营BMS总表].[客户编号] ) > 0 THEN
+				( SUM ( CAST ( [客户经营BMS总表].[IDG FY23 YTD REV激活] AS FLOAT ) ) / COUNT ( [客户经营BMS总表].[客户编号] ) ) * 100 ELSE 0 
+			END,
+			0 
+		) AS NVARCHAR 
+	) + '%' AS [IDG激活率%],
+	SUM ( CAST ( [IDG FY22 YTD REV激活 ] AS FLOAT ) ) AS [FY22 YTD IDG激活 ],
+	CAST (
+		ROUND(
+		CASE
+				
+				WHEN SUM ( CAST ( [客户经营BMS总表].[IDG FY22 YTD REV激活] AS FLOAT ) ) > 0 THEN
+				( SUM ( CAST ( [客户经营BMS总表].[IDG FY23 YTD REV激活] AS FLOAT ) ) - SUM ( CAST ( [客户经营BMS总表].[IDG FY22 YTD REV激活] AS FLOAT ) ) ) / SUM ( CAST ( [客户经营BMS总表].[IDG FY22 YTD REV激活] AS FLOAT ) ) * 100 ELSE 0 
+			END,
+			0 
+		) AS NVARCHAR 
+	) + '%' AS [ IDG 激活 YoY],
+	SUM ( CAST ( [IDG FY23 YTD REV] AS FLOAT )/1000 ) AS [FY23 YTD IDG REV],
+	SUM ( CAST ( [IDG FY22 YTD REV] AS FLOAT )/1000 ) AS [FY22 YTD IDG REV],
+	CAST (
+		ROUND(
+			( SUM ( CAST ( [IDG FY23 YTD REV] AS FLOAT ) ) - SUM ( CAST ( [IDG FY22 YTD REV] AS FLOAT ) ) ) / SUM ( CAST ( [IDG FY22 YTD REV] AS FLOAT ) ) * 100,
+			0 
+		) AS NVARCHAR 
+	) + '%' AS [FY22对FY23的IDG REV YoY增长%],
+	SUM ( CAST ( [FY23 IDG是否产生商机] AS INT ) ) AS [FY23 IDG商机总数],
+	CAST (
+		ROUND(
+		CASE
+				
+				WHEN COUNT ( [客户经营BMS总表].[客户编号] ) > 0 THEN
+				( SUM ( CAST ( [客户经营BMS总表].[FY23 IDG是否产生商机] AS FLOAT ) ) / COUNT ( [客户经营BMS总表].[客户编号] ) ) * 100 ELSE 0 
+			END,
+			0 
+		) AS NVARCHAR 
+	) + '%' AS [FY23 IDG商机率],
+SUM ( CAST ( [FY23 YTD IDG商机 REV$] AS FLOAT )/1000 ) AS [ FY23 YTD IDG商机储备Rev(K$)]
+FROM
+	dbo.[客户经营BMS总表] 
+WHERE
+	[Project D PC] = 'Project D PC' 
+	) AS CombinedResult 
+ORDER BY
+CASE
+		
+		WHEN Tier = '总计' THEN
+		1 
+		WHEN Tier = '0' THEN
+		1 ELSE 0 
+	END,
+	Tier;
+    """,
+
+
+
+#fenge11111111111111
+
+
+
+
+        """
+    SELECT
+CASE
+		
+	WHEN
+		GROUPING( [客户经营BMS总表].[纵队] ) = 1 THEN
+		CASE
+				
+				WHEN [客户经营BMS总表].[管理行业] IS NOT NULL THEN
+				[客户经营BMS总表].[管理行业] + '汇总' ELSE '总计' 
+			END ELSE [客户经营BMS总表].[管理行业] 
+		END AS [管理行业分类],
+		ISNULL( [客户经营BMS总表].[纵队], '' ) AS [纵队分类],
+		COUNT ( [客户经营BMS总表].[客户编号] ) AS [客户数量],
+		SUM(
+        CASE 
+            WHEN CAST([客户经营BMS总表].[YTD是否拜访] AS INT) + CAST([客户经营BMS总表].[YTD是否外呼] AS INT) > 0 THEN 1
+            ELSE 0 
+        END
+    ) AS [YTD覆盖客户数],
+		
+  CAST(
+        CAST(
+            ROUND(
+                SUM(
+                    CASE 
+                        WHEN CAST([客户经营BMS总表].[YTD是否拜访] AS INT) + CAST([客户经营BMS总表].[YTD是否外呼] AS INT) > 0 THEN 1
+                        ELSE 0 
+                    END
+                ) * 100.0 / COUNT([客户经营BMS总表].[客户编号]), 
+                0
+            ) AS INT
+        ) AS NVARCHAR
+    ) + '%' AS [YTD覆盖率%],
+		
+		SUM ( CAST ( [客户经营BMS总表].[IDG FY23 YTD REV激活 ] AS FLOAT ) ) AS [FY23 YTD IDG激活 ],
+		CAST (
+			ROUND(
+			CASE
+					
+					WHEN COUNT ( [客户经营BMS总表].[客户编号] ) > 0 THEN
+					( SUM ( CAST ( [客户经营BMS总表].[IDG FY23 YTD REV激活] AS FLOAT ) ) / COUNT ( [客户经营BMS总表].[客户编号] ) ) * 100 ELSE 0 
+				END,
+				0 
+			) AS NVARCHAR 
+		) + '%' AS [IDG激活率%],
+		
+		
+		SUM ( CAST ( [客户经营BMS总表].[IDG FY22 YTD REV激活 ] AS FLOAT ) ) AS [FY22 YTD IDG激活 ],
+		CAST (
+			ROUND(
+			CASE
+					
+					WHEN SUM ( CAST ( [客户经营BMS总表].[IDG FY22 YTD REV激活] AS FLOAT ) ) > 0 THEN
+					( SUM ( CAST ( [客户经营BMS总表].[IDG FY23 YTD REV激活] AS FLOAT ) ) - SUM ( CAST ( [客户经营BMS总表].[IDG FY22 YTD REV激活] AS FLOAT ) ) ) / SUM ( CAST ( [客户经营BMS总表].[IDG FY22 YTD REV激活] AS FLOAT ) ) * 100 ELSE 0 
+				END,
+				0 
+			) AS NVARCHAR 
+		) + '%' AS [IDG激活YOY%],
+		
+		
+		SUM ( CAST ( [客户经营BMS总表].[IDG FY23 YTD REV] AS FLOAT )/1000 ) AS [FY23 YTD IDG REV],
+		SUM ( CAST ( [客户经营BMS总表].[IDG FY22 YTD REV] AS FLOAT )/1000 ) AS [FY22 YTD IDG REV],
+		CAST (
+			ROUND(
+			CASE
+					
+					WHEN SUM ( CAST ( [客户经营BMS总表].[IDG FY22 YTD REV] AS FLOAT ) ) > 0 THEN
+					( SUM ( CAST ( [客户经营BMS总表].[IDG FY23 YTD REV] AS FLOAT ) ) - SUM ( CAST ( [客户经营BMS总表].[IDG FY22 YTD REV] AS FLOAT ) ) ) / SUM ( CAST ( [客户经营BMS总表].[IDG FY22 YTD REV] AS FLOAT ) ) * 100 ELSE 0 
+				END,
+				0 
+			) AS NVARCHAR 
+		) + '%' AS [ IDG 产出Rev YoY],
+		SUM ( CAST ( [客户经营BMS总表].[FY23 IDG是否产生商机] AS INT ) ) AS [FY23 IDG商机总数],
+		CAST (
+			ROUND(
+			CASE
+					
+					WHEN COUNT ( [客户经营BMS总表].[客户编号] ) > 0 THEN
+					( SUM ( CAST ( [客户经营BMS总表].[FY23 IDG是否产生商机] AS FLOAT ) ) / COUNT ( [客户经营BMS总表].[客户编号] ) ) * 100 ELSE 0 
+				END,
+				0 
+			) AS NVARCHAR 
+		) + '%' AS [FY23 IDG商机率],
+		
+SUM(
+         CAST([客户经营BMS总表].[FY23 YTD IDG商机 REV$] AS FLOAT)/1000 ) AS [ FY23 YTD IDG商机储备Rev(K$)]
+FROM
+    dbo.[客户经营BMS总表]
+	WHERE
+		[客户经营BMS总表].[Project D PC] = 'Project D PC' 
+	GROUP BY
+		[客户经营BMS总表].[管理行业],
+		[客户经营BMS总表].[纵队] WITH ROLLUP 
+	ORDER BY
+	CASE
+			
+			WHEN [客户经营BMS总表].[管理行业] IS NULL THEN
+			1 ELSE 0 
+		END,
+	CASE
+			[客户经营BMS总表].[管理行业] 
+			WHEN '成熟' THEN
+			1 
+			WHEN '新兴' THEN
+			2 
+			END,
+	CASE
+			
+			WHEN [客户经营BMS总表].[纵队] IS NULL THEN
+			1 ELSE 0 
+			END,
+	[客户经营BMS总表].[纵队];
+    """
+    ],
+
+
+
+    'Sheet2': ["""
+SELECT
+	* 
+FROM
+	(
+	SELECT
+		[战区tier].Tier,
+		[客户经营BMS总表].[战区],
+		COUNT ( [客户经营BMS总表].[客户编号] ) AS [客户数量],
+		SUM ( CASE WHEN CAST ( [客户经营BMS总表].[YTD是否拜访] AS INT ) + CAST ( [客户经营BMS总表].[YTD是否外呼] AS INT ) > 0 THEN 1 ELSE 0 END ) AS [YTD覆盖客户数],
+		CAST (
+			CAST (
+				ROUND(
+				SUM ( CASE WHEN CAST ( [客户经营BMS总表].[YTD是否拜访] AS INT ) + CAST ( [客户经营BMS总表].[YTD是否外呼] AS INT ) > 0 THEN 1 ELSE 0 END ) * 100.0 / COUNT ( [客户经营BMS总表].[客户编号] ),
+	0 
+	) AS INT 
+	) AS NVARCHAR 
+	) + '%' AS [YTD覆盖率%],
+	SUM ( CAST ( [客户经营BMS总表].[ISG FY23 YTD REV激活 ] AS FLOAT ) ) AS [FY23 YTD ISG激活 ],
+	CAST (
+		ROUND(
+		CASE
+				
+				WHEN COUNT ( [客户经营BMS总表].[客户编号] ) > 0 THEN
+				( SUM ( CAST ( [客户经营BMS总表].[ISG FY23 YTD REV激活] AS FLOAT ) ) / COUNT ( [客户经营BMS总表].[客户编号] ) ) * 100 ELSE 0 
+			END,
+			0 
+		) AS NVARCHAR 
+	) + '%' AS [ISG激活率%],
+	SUM ( CAST ( [客户经营BMS总表].[ISG FY22 YTD REV激活 ] AS FLOAT ) ) AS [FY22 YTD ISG激活 ],
+	CAST (
+		ROUND(
+		CASE
+				
+				WHEN SUM ( CAST ( [客户经营BMS总表].[ISG FY22 YTD REV激活] AS FLOAT ) ) > 0 THEN
+				( SUM ( CAST ( [客户经营BMS总表].[ISG FY23 YTD REV激活] AS FLOAT ) ) - SUM ( CAST ( [客户经营BMS总表].[ISG FY22 YTD REV激活] AS FLOAT ) ) ) / SUM ( CAST ( [客户经营BMS总表].[ISG FY22 YTD REV激活] AS FLOAT ) ) * 100 ELSE 0 
+			END,
+			0 
+		) AS NVARCHAR 
+	) + '%' AS [ ISG 激活 YoY],
+	SUM ( CAST ( [客户经营BMS总表].[ISG FY23 YTD REV] AS FLOAT )/1000 ) AS [FY23 YTD ISG REV],
+	SUM ( CAST ( [客户经营BMS总表].[ISG FY22 YTD REV] AS FLOAT )/1000 ) AS [FY22 YTD ISG REV],
+	CAST (
+		ROUND(
+		CASE
+				
+				WHEN SUM ( CAST ( [客户经营BMS总表].[ISG FY22 YTD REV] AS FLOAT ) ) > 0 THEN
+				( SUM ( CAST ( [客户经营BMS总表].[ISG FY23 YTD REV] AS FLOAT ) ) - SUM ( CAST ( [客户经营BMS总表].[ISG FY22 YTD REV] AS FLOAT ) ) ) / SUM ( CAST ( [客户经营BMS总表].[ISG FY22 YTD REV] AS FLOAT ) ) * 100 ELSE 0 
+			END,
+			0 
+		) AS NVARCHAR 
+	) + '%' AS [ ISG 产出Rev YoY],
+	SUM ( CAST ( [客户经营BMS总表].[FY23 ISG是否产生商机] AS INT ) ) AS [FY23 ISG商机总数],
+	CAST (
+		ROUND(
+		CASE
+				
+				WHEN COUNT ( [客户经营BMS总表].[客户编号] ) > 0 THEN
+				( SUM ( CAST ( [客户经营BMS总表].[FY23 ISG是否产生商机] AS FLOAT ) ) / COUNT ( [客户经营BMS总表].[客户编号] ) ) * 100 ELSE 0 
+			END,
+			0 
+		) AS NVARCHAR 
+	) + '%' AS [FY23 ISG商机率],
+	SUM ( CAST ( [FY23 YTD ISG商机 REV$] AS FLOAT )/1000 ) AS [ FY23 YTD ISG商机储备Rev(K$)] 
+FROM
+	dbo.[战区tier]
+	INNER JOIN dbo.[客户经营BMS总表] ON [战区tier].[战区] = [客户经营BMS总表].[战区] 
+WHERE
+	[客户经营BMS总表].[Project D ISG] = 'Project D ISG' 
+	     /*AND NOT([FY23中国区分层] = 'B1')
+    AND NOT([FY23中国区分层] = 'B2' AND  [B2优选] = '否')
+    AND NOT ([FY23中国区分层] = 'B2院系' AND  [B2优选] = '否')*/
+
+
+GROUP BY
+	[战区tier].Tier,
+	[客户经营BMS总表].[战区] UNION ALL
+SELECT
+	'总计' AS Tier,
+	'总计' AS [战区],
+	COUNT ( [客户编号] ) AS [客户数量],
+	SUM ( CASE WHEN CAST ( [YTD是否拜访] AS INT ) + CAST ( [YTD是否外呼] AS INT ) > 0 THEN 1 ELSE 0 END ) AS [YTD覆盖客户数],
+	CAST (
+		CAST (
+			ROUND(
+			SUM ( CASE WHEN CAST ( [客户经营BMS总表].[YTD是否拜访] AS INT ) + CAST ( [客户经营BMS总表].[YTD是否外呼] AS INT ) > 0 THEN 1 ELSE 0 END ) * 100.0 / COUNT ( [客户经营BMS总表].[客户编号] ),
+	0 
+	) AS INT 
+	) AS NVARCHAR 
+	) + '%' AS [YTD覆盖率%],
+	SUM ( CAST ( [ISG FY23 YTD REV激活 ] AS FLOAT ) ) AS [FY23 YTD ISG激活 ],
+	CAST (
+		ROUND(
+		CASE
+				
+				WHEN COUNT ( [客户经营BMS总表].[客户编号] ) > 0 THEN
+				( SUM ( CAST ( [客户经营BMS总表].[ISG FY23 YTD REV激活] AS FLOAT ) ) / COUNT ( [客户经营BMS总表].[客户编号] ) ) * 100 ELSE 0 
+			END,
+			0 
+		) AS NVARCHAR 
+	) + '%' AS [ISG激活率%],
+	SUM ( CAST ( [ISG FY22 YTD REV激活 ] AS FLOAT ) ) AS [FY22 YTD ISG激活 ],
+	CAST (
+		ROUND(
+		CASE
+				
+				WHEN SUM ( CAST ( [客户经营BMS总表].[ISG FY22 YTD REV激活] AS FLOAT ) ) > 0 THEN
+				( SUM ( CAST ( [客户经营BMS总表].[ISG FY23 YTD REV激活] AS FLOAT ) ) - SUM ( CAST ( [客户经营BMS总表].[ISG FY22 YTD REV激活] AS FLOAT ) ) ) / SUM ( CAST ( [客户经营BMS总表].[ISG FY22 YTD REV激活] AS FLOAT ) ) * 100 ELSE 0 
+			END,
+			0 
+		) AS NVARCHAR 
+	) + '%' AS [ ISG 激活 YoY],
+	SUM ( CAST ( [ISG FY23 YTD REV] AS FLOAT )/1000) AS [FY23 YTD ISG REV],
+	SUM ( CAST ( [ISG FY22 YTD REV] AS FLOAT )/1000 ) AS [FY22 YTD ISG REV],
+	CAST (
+		ROUND(
+			( SUM ( CAST ( [ISG FY23 YTD REV] AS FLOAT ) ) - SUM ( CAST ( [ISG FY22 YTD REV] AS FLOAT ) ) ) / SUM ( CAST ( [ISG FY22 YTD REV] AS FLOAT ) ) * 100,
+			0 
+		) AS NVARCHAR 
+	) + '%' AS [ ISG 产出Rev YoY],
+	SUM ( CAST ( [FY23 ISG是否产生商机] AS INT ) ) AS [FY23 ISG商机总数],
+	CAST (
+		ROUND(
+		CASE
+				
+				WHEN COUNT ( [客户经营BMS总表].[客户编号] ) > 0 THEN
+				( SUM ( CAST ( [客户经营BMS总表].[FY23 ISG是否产生商机] AS FLOAT ) ) / COUNT ( [客户经营BMS总表].[客户编号] ) ) * 100 ELSE 0 
+			END,
+			0 
+		) AS NVARCHAR 
+	) + '%' AS [FY23 ISG商机率],
+	SUM ( CAST ( [FY23 YTD ISG商机 REV$] AS FLOAT )/1000 ) AS [ FY23 YTD ISG商机储备Rev(K$)] 
+FROM
+    dbo.[客户经营BMS总表]
+WHERE
+    [Project D ISG] = 'Project D ISG' 
+    /*AND NOT([FY23中国区分层] = 'B1')
+    AND NOT([FY23中国区分层] = 'B2' AND  [B2优选] = '否')
+    AND NOT ([FY23中国区分层] = 'B2院系' AND  [B2优选] = '否')*/
+
+
+) AS CombinedResult
+ORDER BY
+CASE
+    WHEN Tier = '总计' THEN 2 
+    WHEN Tier = '0' THEN 1 
+    ELSE 0 
+END,
+Tier;
+    """,
+#fenge22222222222222
+        """
+        SELECT
+CASE
+		
+	WHEN
+		GROUPING( [客户经营BMS总表].[纵队] ) = 1 THEN
+		CASE
+				
+				WHEN [客户经营BMS总表].[管理行业] IS NOT NULL THEN
+				[客户经营BMS总表].[管理行业] + '汇总' ELSE '总计' 
+			END ELSE [客户经营BMS总表].[管理行业] 
+		END AS [管理行业分类],
+		ISNULL( [客户经营BMS总表].[纵队], '' ) AS [纵队分类],
+		COUNT ( [客户经营BMS总表].[客户编号] ) AS [客户数量],
+		SUM ( CASE WHEN CAST ( [客户经营BMS总表].[YTD是否拜访] AS INT ) + CAST ( [客户经营BMS总表].[YTD是否外呼] AS INT ) > 0 THEN 1 ELSE 0 END ) AS [YTD覆盖客户数],
+		CAST (
+			CAST (
+				ROUND(
+				SUM ( CASE WHEN CAST ( [客户经营BMS总表].[YTD是否拜访] AS INT ) + CAST ( [客户经营BMS总表].[YTD是否外呼] AS INT ) > 0 THEN 1 ELSE 0 END ) * 100.0 / COUNT ( [客户经营BMS总表].[客户编号] ),
+	0 
+	) AS INT 
+	) AS NVARCHAR 
+	) + '%' AS [YTD覆盖率%],
+	SUM ( CAST ( [客户经营BMS总表].[ISG FY23 YTD REV激活 ] AS FLOAT ) ) AS [FY23 YTD ISG激活 ],
+	CAST (
+		ROUND(
+		CASE
+				
+				WHEN COUNT ( [客户经营BMS总表].[客户编号] ) > 0 THEN
+				( SUM ( CAST ( [客户经营BMS总表].[ISG FY23 YTD REV激活] AS FLOAT ) ) / COUNT ( [客户经营BMS总表].[客户编号] ) ) * 100 ELSE 0 
+			END,
+			0 
+		) AS NVARCHAR 
+	) + '%' AS [ISG激活率%],
+	SUM ( CAST ( [客户经营BMS总表].[ISG FY22 YTD REV激活 ] AS FLOAT ) ) AS [FY22 YTD ISG激活 ],
+	CAST (
+		ROUND(
+		CASE
+				
+				WHEN SUM ( CAST ( [客户经营BMS总表].[ISG FY22 YTD REV激活] AS FLOAT ) ) > 0 THEN
+				( SUM ( CAST ( [客户经营BMS总表].[ISG FY23 YTD REV激活] AS FLOAT ) ) - SUM ( CAST ( [客户经营BMS总表].[ISG FY22 YTD REV激活] AS FLOAT ) ) ) / SUM ( CAST ( [客户经营BMS总表].[ISG FY22 YTD REV激活] AS FLOAT ) ) * 100 ELSE 0 
+			END,
+			0 
+		) AS NVARCHAR 
+	) + '%' AS [ISG激活YOY],
+	SUM ( CAST ( [客户经营BMS总表].[ISG FY23 YTD REV] AS FLOAT )/1000 ) AS [FY23 YTD ISG REV],
+	SUM ( CAST ( [客户经营BMS总表].[ISG FY22 YTD REV] AS FLOAT )/1000 ) AS [FY22 YTD ISG REV],
+	CAST (
+		ROUND(
+		CASE
+				
+				WHEN SUM ( CAST ( [客户经营BMS总表].[ISG FY22 YTD REV] AS FLOAT ) ) > 0 THEN
+				( SUM ( CAST ( [客户经营BMS总表].[ISG FY23 YTD REV] AS FLOAT ) ) - SUM ( CAST ( [客户经营BMS总表].[ISG FY22 YTD REV] AS FLOAT ) ) ) / SUM ( CAST ( [客户经营BMS总表].[ISG FY22 YTD REV] AS FLOAT ) ) * 100 ELSE 0 
+			END,
+			0 
+		) AS NVARCHAR 
+	) + '%' AS [ ISG 产出Rev YoY],
+	SUM ( CAST ( [客户经营BMS总表].[FY23 ISG是否产生商机] AS INT ) ) AS [FY23 ISG商机总数],
+	CAST (
+		ROUND(
+		CASE
+				
+				WHEN COUNT ( [客户经营BMS总表].[客户编号] ) > 0 THEN
+				( SUM ( CAST ( [客户经营BMS总表].[FY23 ISG是否产生商机] AS FLOAT ) ) / COUNT ( [客户经营BMS总表].[客户编号] ) ) * 100 ELSE 0 
+			END,
+			0 
+		) AS NVARCHAR 
+	) + '%' AS [FY23 ISG商机率],
+	SUM ( CAST ( [客户经营BMS总表].[FY23 YTD ISG商机 REV$] AS FLOAT )/1000 ) AS [ FY23 YTD ISG商机储备Rev(K$)] 
+FROM
+	dbo.[客户经营BMS总表] 
+WHERE
+    [Project D ISG] = 'Project D ISG' 
+     /*AND NOT([FY23中国区分层] = 'B1')
+    AND NOT([FY23中国区分层] = 'B2' AND  [B2优选] = '否')
+    AND NOT ([FY23中国区分层] = 'B2院系' AND  [B2优选] = '否')*/
+GROUP BY
+	[客户经营BMS总表].[管理行业],
+	[客户经营BMS总表].[纵队] WITH ROLLUP 
+ORDER BY
+CASE
+		
+		WHEN GROUPING( [客户经营BMS总表].[管理行业] ) = 1 THEN
+		2 ELSE 1 
+	END,
+CASE
+	
+	WHEN [客户经营BMS总表].[管理行业] IS NULL THEN
+	'总计' 
+	WHEN [客户经营BMS总表].[管理行业] = '成熟' THEN
+	'01成熟' 
+	WHEN [客户经营BMS总表].[管理行业] = '新兴' THEN
+	'02新兴' ELSE [客户经营BMS总表].[管理行业] 
+	END,
+CASE
+	
+	WHEN GROUPING( [客户经营BMS总表].[纵队] ) = 1 THEN
+	2 ELSE 1 
+	END,
+	[客户经营BMS总表].[纵队];
+    """
+    ]
+}
+
+# 创建一个新的工作簿
+wb = Workbook()
+
+# 移除默认创建的sheet
+wb.remove(wb.active)
+
+# 自定义的标题栏样式
+header_fill = PatternFill(start_color="FFDCE6F1", end_color="FFDCE6F1", fill_type="solid")
+header_font = Font(color="000000FF")
+header_alignment = Alignment(horizontal="center", vertical="center")
+
+# 遍历查询语句并写入数据
+for sheet_name, queries in sql_queries.items():
+    ws = wb.create_sheet(title=sheet_name)
+
+    # 设置标题样式的函数
+    def set_titles(start_row, is_idg=True):
+        # 根据是否是IDG来调整标题
+        idg_or_isg = "IDG" if is_idg else "ISG"
+
+        # 创建第一行标题
+        first_row_titles = [
+            ("A{0}:B{0}".format(start_row), "PC营销关注"),
+            ("C{0}:E{0}".format(start_row), "FY23 YTD覆盖"),
+            ("F{0}:I{0}".format(start_row), "FY23 YTD激活"),
+            ("J{0}:L{0}".format(start_row), "FY23 YTD产出"),
+            ("M{0}:O{0}".format(start_row), "有效商机储备"),
+            ("P{0}:R{0}".format(start_row), "商机储备-LW"),
+            ("S{0}:T{0}".format(start_row), "商机WoW")
+        ]
+
+        # 创建第二行标题，根据是IDG还是ISG来更改标题
+        second_row_titles = [
+            "管理行业", "纵队", "客户数", "YTD覆盖客户数", "YTD覆盖率%",
+            f"FY23 YTD {idg_or_isg}激活", f"{idg_or_isg}激活率%", f"FY22 YTD {idg_or_isg}激活", f"{idg_or_isg}激活YoY",
+            f"FY23 YTD {idg_or_isg} Rev（K$)", f"FY22 YTD {idg_or_isg} Rev（K$)", f"{idg_or_isg} 产出Rev YoY",
+            f"FY23 {idg_or_isg}商机客户数", f"{idg_or_isg}商机客户占比", f"FY23 YTD {idg_or_isg}商机储备Rev(K$)",
+            f"FY23 {idg_or_isg}商机客户数", f"{idg_or_isg}商机客户占比", f"FY23 YTD {idg_or_isg}商机储备Rev(K$)",
+            f"{idg_or_isg}商机客户数", f"{idg_or_isg}商机金额Rev（K$)"
+        ]
+
+        # 合并单元格并设置第一行标题
+        for cell_range, title in first_row_titles:
+            ws.merge_cells(cell_range)
+            cell = ws[cell_range.split(":")[0]]
+            cell.value = title
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = header_alignment
+
+        # 设置第二行标题
+        second_row = start_row + 1
+        for col_num, title in enumerate(second_row_titles, start=1):
+            cell = ws.cell(row=second_row, column=col_num)
+            cell.value = title
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = header_alignment
+
+        return second_row + 1  # 返回数据开始的行号
+
+   
+    data_start_row = set_titles(1, is_idg=(sheet_name != 'Sheet2'))
+
+    
+    for index, query in enumerate(queries):
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        
+        
+        if index == 1:
+            # 使用is_idg参数来确定是否使用IDG或ISG
+            data_start_row = set_titles(32, is_idg=(sheet_name != 'Sheet2'))  # 重新设置标题并获取新的数据开始行数
+
+        # 写入查询结果数据
+        for row in rows:
+            ws.append(row)
+
+        # 更新数据开始行数为下一个数据块的开始行数
+        if index == 0:
+            data_start_row = ws.max_row + 2  # 假设第一个数据块和第二个数据块之间有一行空白
+
+# 保存工作簿
+wb.save('output_with_headers.xlsx')
+
+# 关闭数据库连接
+cursor.close()
+conn.close()
+print("数据已写入Excel文件，并且数据库连接已关闭。")
